@@ -1,0 +1,81 @@
+{
+  "name": "QA Auto Screenshots",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "qa-screenshot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [200, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://production-sfo.browserless.io/screenshot?token=PASTE_YOUR_BROWSERLESS_TOKEN_HERE",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"{{ $json.body.url }}\",\n  \"options\": {\n    \"fullPage\": {{ $json.body.fullPage || false }},\n    \"type\": \"png\"\n  },\n  \"gotoOptions\": {\n    \"waitUntil\": \"networkidle2\",\n    \"timeout\": 30000\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "2a",
+      "name": "Take Screenshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [420, 300],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  if (item.binary && item.binary.data) {\n    const base64 = Buffer.from(item.binary.data.data, 'base64').toString('base64');\n    item.json = {\n      success: true,\n      screenshot: `data:image/png;base64,${base64}`,\n      url: $('Webhook').first().json.body?.url,\n      timestamp: new Date().toISOString()\n    };\n  } else {\n    item.json = {\n      success: false,\n      error: 'Screenshot failed'\n    };\n  }\n}\n\nreturn items;"
+      },
+      "id": "3a",
+      "name": "Convert to Base64",
+      "type": "n8n-nodes-base.code",
+      "position": [640, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin", "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" }
+            ]
+          }
+        }
+      },
+      "id": "4a",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [860, 300],
+      "typeVersion": 1.1
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Take Screenshot", "type": "main", "index": 0 }]]
+    },
+    "Take Screenshot": {
+      "main": [[{ "node": "Convert to Base64", "type": "main", "index": 0 }]]
+    },
+    "Convert to Base64": {
+      "main": [[{ "node": "Send Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,8 +1,8 @@
-# QA Auto
+# QA Auto - Setup Instructions
 
 Visual QA testing tool with real browser screenshots and staging vs production comparison.
 
-## Quick Setup
+## Quick Setup (5 minutes)
 
 ### Step 1: Get Browserless.io Token (Free)
 
@@ -20,10 +20,28 @@ Visual QA testing tool with real browser screenshots and staging vs production c
 6. Save and **Activate** the workflow
 7. Click on "Webhook" node → Copy the **Production URL**
 
-### Step 3: Run the App
+### Step 3: Run the React App
 
 ```bash
-npm install
+# Create project
+npm create vite@latest qa-auto -- --template react
+cd qa-auto
+
+# Install dependencies
+npm install lucide-react
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# Replace src/App.jsx with App.jsx from this gist
+# Update tailwind.config.js content array:
+# content: ["./index.html", "./src/**/*.{js,jsx}"]
+
+# Add to src/index.css:
+# @tailwind base;
+# @tailwind components;
+# @tailwind utilities;
+
+# Run
 npm run dev
 ```
 
