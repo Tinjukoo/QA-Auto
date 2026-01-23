@@ -1,11 +1,16 @@
 {
   "name": "qa-auto",
-  "version": "1.0.0",
-  "description": "QA Automation toolkit with screenshot API integration",
+  "version": "2.0.0",
+  "description": "QA Automation toolkit - Create, record, and run automated browser tests without writing code",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run dev",
+    "dev": "npm run start:backend & npm run start:frontend",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "screenshot": "node src/screenshot.js",
     "webhook": "node src/webhook.js",
     "test": "node --test"
@@ -14,7 +19,10 @@
     "qa",
     "automation",
     "screenshot",
-    "browserless"
+    "browserless",
+    "testing",
+    "e2e",
+    "visual-testing"
   ],
   "author": "",
   "license": "MIT",
