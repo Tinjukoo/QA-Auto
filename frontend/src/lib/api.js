@@ -89,4 +89,12 @@ export const schedules = {
   trigger: (id) => request(`/schedules/${id}/trigger`, { method: 'POST' }),
 }
 
-export default { tests, suites, runs, webhooks, schedules }
+// Proxy API
+export const proxy = {
+  screenshot: (url, fullPage = false) => request('/proxy/screenshot', {
+    method: 'POST',
+    body: { url, fullPage }
+  }),
+}
+
+export default { tests, suites, runs, webhooks, schedules, proxy }

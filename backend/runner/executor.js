@@ -24,7 +24,7 @@ if (!fs.existsSync(SCREENSHOTS_DIR)) {
  */
 export async function runTest(test, runId, options = {}) {
   const startTime = Date.now();
-  const steps = JSON.parse(test.steps || '[]');
+  const steps = typeof test.steps === 'string' ? JSON.parse(test.steps || '[]') : (test.steps || []);
   const stepResults = [];
   const screenshots = [];
   let overallStatus = 'passed';
