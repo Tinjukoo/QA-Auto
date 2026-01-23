@@ -1381,7 +1381,7 @@ const html = `<!DOCTYPE html>
 </html>`;
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, \`http://localhost:\${PORT}\`);
+  const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (req.method === 'GET' && url.pathname === '/') {
     res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -1430,5 +1430,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(\`QA Studio running at http://localhost:\${PORT}\`);
+  console.log(`QA Studio running at http://localhost:${PORT}`);
 });
