@@ -7,6 +7,7 @@ import suitesRouter from './routes/suites.js';
 import runsRouter from './routes/runs.js';
 import webhooksRouter from './routes/webhooks.js';
 import schedulesRouter from './routes/schedules.js';
+import proxyRouter from './routes/proxy.js';
 
 const app = express();
 const PORT = process.env.BACKEND_PORT || 3001;
@@ -29,6 +30,7 @@ app.use('/api/suites', suitesRouter);
 app.use('/api/runs', runsRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/schedules', schedulesRouter);
+app.use('/api/proxy', proxyRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
