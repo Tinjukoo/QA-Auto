@@ -34,10 +34,10 @@ router.get('/', (req, res) => {
   // Parse JSON steps for each test
   const parsedTests = tests.map(test => ({
     ...test,
-    steps: JSON.parse(test.steps || '[]')
+    steps: typeof test.steps === 'string' ? JSON.parse(test.steps || '[]') : (test.steps || [])
   }));
 
-  res.json(parsedTests);
+  res.json({ tests: parsedTests });
 });
 
 // Get single test
@@ -49,7 +49,7 @@ router.get('/:id', (req, res) => {
     return res.status(404).json({ error: 'Test not found' });
   }
 
-  test.steps = JSON.parse(test.steps || '[]');
+  test.steps = typeof test.steps === 'string' ? JSON.parse(test.steps || '[]') : (test.steps || []);
   res.json(test);
 });
 
@@ -67,13 +67,13 @@ router.post('/', (req, res) => {
 
   db.prepare(`
     INSERT INTO tests (id, name, description, base_url, steps, suite_id, status)
-    VALUES (?, ?, ?, ?, ?, ?, 'draft')
+    VALUES (?, ?, ?, ?, ?, ?, 'active')
   `).run(id, name, description || null, base_url || null, stepsJson, suite_id || null);
 
   const test = db.prepare('SELECT * FROM tests WHERE id = ?').get(id);
-  test.steps = JSON.parse(test.steps);
+  test.steps = typeof test.steps === 'string' ? JSON.parse(test.steps) : test.steps;
 
-  res.status(201).json(test);
+  res.status(201).json({ test });
 });
 
 // Update test
@@ -86,7 +86,8 @@ router.put('/:id', (req, res) => {
     return res.status(404).json({ error: 'Test not found' });
   }
 
-  const stepsJson = steps ? JSON.stringify(steps) : existing.steps;
+  const existingSteps = typeof existing.steps === 'string' ? existing.steps : JSON.stringify(existing.steps);
+  const stepsJson = steps ? JSON.stringify(steps) : existingSteps;
 
   db.prepare(`
     UPDATE tests
@@ -103,7 +104,7 @@ router.put('/:id', (req, res) => {
   );
 
   const test = db.prepare('SELECT * FROM tests WHERE id = ?').get(req.params.id);
-  test.steps = JSON.parse(test.steps);
+  test.steps = typeof test.steps === 'string' ? JSON.parse(test.steps) : test.steps;
 
   res.json(test);
 });
@@ -131,14 +132,15 @@ router.post('/:id/duplicate', (req, res) => {
 
   const id = uuidv4();
   const newName = `${original.name} (Copy)`;
+  const originalSteps = typeof original.steps === 'string' ? original.steps : JSON.stringify(original.steps);
 
   db.prepare(`
     INSERT INTO tests (id, name, description, base_url, steps, suite_id, status)
     VALUES (?, ?, ?, ?, ?, ?, 'draft')
-  `).run(id, newName, original.description, original.base_url, original.steps, original.suite_id);
+  `).run(id, newName, original.description, original.base_url, originalSteps, original.suite_id);
 
   const test = db.prepare('SELECT * FROM tests WHERE id = ?').get(id);
-  test.steps = JSON.parse(test.steps);
+  test.steps = typeof test.steps === 'string' ? JSON.parse(test.steps) : test.steps;
 
   res.status(201).json(test);
 });
@@ -157,8 +159,8 @@ router.get('/:id/runs', (req, res) => {
 
   const parsedRuns = runs.map(run => ({
     ...run,
-    results: JSON.parse(run.results || '[]'),
-    screenshots: JSON.parse(run.screenshots || '[]')
+    results: typeof run.results === 'string' ? JSON.parse(run.results || '[]') : (run.results || []),
+    screenshots: typeof run.screenshots === 'string' ? JSON.parse(run.screenshots || '[]') : (run.screenshots || [])
   }));
 
   res.json(parsedRuns);

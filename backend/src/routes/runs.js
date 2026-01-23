@@ -50,8 +50,8 @@ router.get('/', (req, res) => {
 
   const parsedRuns = runs.map(run => ({
     ...run,
-    results: JSON.parse(run.results || '[]'),
-    screenshots: JSON.parse(run.screenshots || '[]')
+    results: typeof run.results === 'string' ? JSON.parse(run.results || '[]') : (run.results || []),
+    screenshots: typeof run.screenshots === 'string' ? JSON.parse(run.screenshots || '[]') : (run.screenshots || [])
   }));
 
   res.json({
@@ -84,9 +84,9 @@ router.get('/:id', (req, res) => {
     SELECT * FROM step_results WHERE run_id = ? ORDER BY step_index
   `).all(req.params.id);
 
-  run.results = JSON.parse(run.results || '[]');
-  run.screenshots = JSON.parse(run.screenshots || '[]');
-  run.test_steps = JSON.parse(run.test_steps || '[]');
+  run.results = typeof run.results === 'string' ? JSON.parse(run.results || '[]') : (run.results || []);
+  run.screenshots = typeof run.screenshots === 'string' ? JSON.parse(run.screenshots || '[]') : (run.screenshots || []);
+  run.test_steps = typeof run.test_steps === 'string' ? JSON.parse(run.test_steps || '[]') : (run.test_steps || []);
   run.step_results = stepResults;
 
   res.json(run);
@@ -116,9 +116,11 @@ router.post('/', async (req, res) => {
 
   // Return immediately, run test in background
   res.status(201).json({
-    id: runId,
-    test_id,
-    status: 'running',
+    run: {
+      id: runId,
+      test_id,
+      status: 'running'
+    },
     message: 'Test run started'
   });
 

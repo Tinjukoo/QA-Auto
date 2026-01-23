@@ -8,50 +8,57 @@ const router = express.Router();
 router.get('/', (req, res) => {
   const db = getDb();
   const schedules = db.prepare(`
-    SELECT
-      s.*,
-      t.name as test_name,
-      ts.name as suite_name
-    FROM schedules s
-    LEFT JOIN tests t ON s.test_id = t.id
-    LEFT JOIN test_suites ts ON s.suite_id = ts.id
-    ORDER BY s.created_at DESC
+    SELECT * FROM schedules ORDER BY created_at DESC
   `).all();
 
-  const parsed = schedules.map(s => ({
-    ...s,
-    active: Boolean(s.active)
-  }));
+  // Enrich with test/suite names
+  const enriched = schedules.map(s => {
+    const result = { ...s, active: Boolean(s.active) };
 
-  res.json(parsed);
+    if (s.test_id) {
+      const test = db.prepare('SELECT name FROM tests WHERE id = ?').get(s.test_id);
+      result.test_name = test?.name || null;
+    }
+
+    if (s.suite_id) {
+      const suite = db.prepare('SELECT name FROM test_suites WHERE id = ?').get(s.suite_id);
+      result.suite_name = suite?.name || null;
+    }
+
+    return result;
+  });
+
+  res.json(enriched);
 });
 
 // Get single schedule
 router.get('/:id', (req, res) => {
   const db = getDb();
-  const schedule = db.prepare(`
-    SELECT
-      s.*,
-      t.name as test_name,
-      ts.name as suite_name
-    FROM schedules s
-    LEFT JOIN tests t ON s.test_id = t.id
-    LEFT JOIN test_suites ts ON s.suite_id = ts.id
-    WHERE s.id = ?
-  `).get(req.params.id);
+  const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(req.params.id);
 
   if (!schedule) {
     return res.status(404).json({ error: 'Schedule not found' });
   }
 
   schedule.active = Boolean(schedule.active);
+
+  if (schedule.test_id) {
+    const test = db.prepare('SELECT name FROM tests WHERE id = ?').get(schedule.test_id);
+    schedule.test_name = test?.name || null;
+  }
+
+  if (schedule.suite_id) {
+    const suite = db.prepare('SELECT name FROM test_suites WHERE id = ?').get(schedule.suite_id);
+    schedule.suite_name = suite?.name || null;
+  }
+
   res.json(schedule);
 });
 
 // Create schedule
 router.post('/', (req, res) => {
   const db = getDb();
-  const { test_id, suite_id, cron_expression, timezone } = req.body;
+  const { test_id, suite_id, cron_expression, timezone, is_active } = req.body;
 
   if (!cron_expression) {
     return res.status(400).json({ error: 'cron_expression is required' });
@@ -78,24 +85,21 @@ router.post('/', (req, res) => {
 
   const id = uuidv4();
   const nextRun = calculateNextRun(cron_expression, timezone || 'UTC');
+  const active = is_active !== undefined ? (is_active ? 1 : 0) : 1;
 
   db.prepare(`
     INSERT INTO schedules (id, test_id, suite_id, cron_expression, timezone, next_run_at, active)
-    VALUES (?, ?, ?, ?, ?, ?, 1)
-  `).run(id, test_id || null, suite_id || null, cron_expression, timezone || 'UTC', nextRun);
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, test_id || null, suite_id || null, cron_expression, timezone || 'UTC', nextRun, active);
 
-  const schedule = db.prepare(`
-    SELECT
-      s.*,
-      t.name as test_name,
-      ts.name as suite_name
-    FROM schedules s
-    LEFT JOIN tests t ON s.test_id = t.id
-    LEFT JOIN test_suites ts ON s.suite_id = ts.id
-    WHERE s.id = ?
-  `).get(id);
-
+  const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(id);
   schedule.active = Boolean(schedule.active);
+
+  if (schedule.test_id) {
+    const test = db.prepare('SELECT name FROM tests WHERE id = ?').get(schedule.test_id);
+    schedule.test_name = test?.name || null;
+  }
+
   res.status(201).json(schedule);
 });
 
@@ -112,31 +116,22 @@ router.put('/:id', (req, res) => {
   const newCron = cron_expression || existing.cron_expression;
   const newTimezone = timezone || existing.timezone;
   const nextRun = calculateNextRun(newCron, newTimezone);
+  const newActive = active !== undefined ? (active ? 1 : 0) : existing.active;
 
   db.prepare(`
     UPDATE schedules
     SET cron_expression = ?, timezone = ?, active = ?, next_run_at = ?, updated_at = datetime('now')
     WHERE id = ?
-  `).run(
-    newCron,
-    newTimezone,
-    active !== undefined ? (active ? 1 : 0) : existing.active,
-    nextRun,
-    req.params.id
-  );
+  `).run(newCron, newTimezone, newActive, nextRun, req.params.id);
 
-  const schedule = db.prepare(`
-    SELECT
-      s.*,
-      t.name as test_name,
-      ts.name as suite_name
-    FROM schedules s
-    LEFT JOIN tests t ON s.test_id = t.id
-    LEFT JOIN test_suites ts ON s.suite_id = ts.id
-    WHERE s.id = ?
-  `).get(req.params.id);
-
+  const schedule = db.prepare('SELECT * FROM schedules WHERE id = ?').get(req.params.id);
   schedule.active = Boolean(schedule.active);
+
+  if (schedule.test_id) {
+    const test = db.prepare('SELECT name FROM tests WHERE id = ?').get(schedule.test_id);
+    schedule.test_name = test?.name || null;
+  }
+
   res.json(schedule);
 });
 
@@ -161,14 +156,12 @@ router.post('/:id/trigger', async (req, res) => {
     return res.status(404).json({ error: 'Schedule not found' });
   }
 
-  // Update last run time
+  const nextRun = calculateNextRun(schedule.cron_expression, schedule.timezone);
+
   db.prepare(`
     UPDATE schedules SET last_run_at = datetime('now'), next_run_at = ?
     WHERE id = ?
-  `).run(
-    calculateNextRun(schedule.cron_expression, schedule.timezone),
-    req.params.id
-  );
+  `).run(nextRun, req.params.id);
 
   res.json({
     message: 'Schedule triggered',
@@ -180,10 +173,26 @@ router.post('/:id/trigger', async (req, res) => {
 
 // Simple cron next run calculator
 function calculateNextRun(cronExpression, timezone) {
-  // Simplified - just return 1 hour from now for basic schedules
-  // In production, use a proper cron parser library
+  // Simplified - parse basic cron format and calculate next run
+  const parts = cronExpression.split(' ');
   const next = new Date();
-  next.setHours(next.getHours() + 1);
+
+  if (parts.length >= 2) {
+    const minute = parts[0] === '*' ? next.getMinutes() : parseInt(parts[0]);
+    const hour = parts[1] === '*' ? next.getHours() : parseInt(parts[1]);
+
+    next.setMinutes(minute);
+    next.setHours(hour);
+
+    // If time has passed today, schedule for tomorrow
+    if (next <= new Date()) {
+      next.setDate(next.getDate() + 1);
+    }
+  } else {
+    // Default to 1 hour from now
+    next.setHours(next.getHours() + 1);
+  }
+
   return next.toISOString();
 }
 
